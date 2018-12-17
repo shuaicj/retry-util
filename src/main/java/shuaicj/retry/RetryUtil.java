@@ -5,6 +5,11 @@ import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import shuaicj.retry.exception.RetryException;
+import shuaicj.retry.exception.RetryExhaustedException;
+import shuaicj.retry.exception.RetryInterruptedException;
+import shuaicj.retry.exception.RetryPredicateFailedException;
+import shuaicj.retry.exception.RetryPredicateFalseException;
 
 /**
  * The retry util.
@@ -92,19 +97,46 @@ public class RetryUtil {
     public static <T> T retry(String message, Callable<T> callable, Predicate<T> until,
                               long maxRetries, long delayMillis) throws RetryException {
         for (long i = 0; i < maxRetries; i++) {
+            T result = null;
+            Throwable callException = null;
             try {
-                T rt = callable.call();
-                if (!until.test(rt)) {
-                    throw new IllegalStateException("the retry test returns false");
-                }
-                return rt;
+                result = callable.call();
             } catch (Throwable e) {
                 logger.error(message + " retry " + i + " failed, " + e.toString());
-                if (i == maxRetries - 1) {
-                    throw new RetryException(message + " retry " + i + " failed finally", e);
-                }
-                sleep(delayMillis, message + " retry " + i + " interrupted");
+                callException = e;
             }
+
+            boolean testOk = false;
+            Throwable testException = null;
+            if (callException == null) {
+                try {
+                    testOk = until.test(result);
+                } catch (Throwable e) {
+                    logger.error(message + " retry " + i + " failed, " + e.toString());
+                    testException = e;
+                }
+            }
+
+            if (testException == null) {
+                if (testOk) {
+                    return result;
+                }
+                logger.error(message + " retry " + i + " the retry test returns false");
+            }
+
+            if (i < maxRetries - 1) {
+                sleep(delayMillis, message + " retry " + i + " interrupted");
+                continue;
+            }
+
+            String errMessage = message + " retry " + i + " failed finally";
+            if (callException != null) {
+                throw new RetryExhaustedException(errMessage, callException);
+            }
+            if (testException != null) {
+                throw new RetryPredicateFailedException(result, errMessage, testException);
+            }
+            throw new RetryPredicateFalseException(result, errMessage);
         }
         // impossible to be here
         return null;
@@ -122,28 +154,18 @@ public class RetryUtil {
      */
     public static void retry(String message, RetryRunnable runnable, RetryPredicate until,
                              long maxRetries, long delayMillis) throws RetryException {
-        for (long i = 0; i < maxRetries; i++) {
-            try {
-                runnable.run();
-                if (!until.test()) {
-                    throw new IllegalStateException("the retry test returns false");
-                }
-                return;
-            } catch (Throwable e) {
-                logger.error(message + " retry " + i + " failed, " + e.toString());
-                if (i == maxRetries - 1) {
-                    throw new RetryException(message + " retry " + i + " failed finally", e);
-                }
-                sleep(delayMillis, message + " retry " + i + " interrupted");
-            }
-        }
+        // forward to the above method
+        retry(message, () -> {
+            runnable.run();
+            return true;
+        }, b -> until.test(), maxRetries, delayMillis);
     }
 
-    private static void sleep(long millis, String message) throws RetryException {
+    private static void sleep(long millis, String message) throws RetryInterruptedException {
         try {
             Thread.sleep(millis);
         } catch (InterruptedException e) {
-            throw new RetryException(message, e);
+            throw new RetryInterruptedException(message, e);
         }
     }
 }
