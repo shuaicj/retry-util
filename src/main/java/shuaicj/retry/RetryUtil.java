@@ -100,6 +100,9 @@ public class RetryUtil {
             T result;
             try {
                 result = callable.call();
+            } catch (InterruptedException e) {
+                logger.error(message + " retry " + i + " interrupted");
+                throw new RetryInterruptedException(message + " retry " + i + " interrupted", e);
             } catch (Throwable e) {
                 logger.error(message + " retry " + i + " failed, " + e.toString());
                 if (i == maxRetries) {
