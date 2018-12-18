@@ -6,7 +6,7 @@ import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import shuaicj.retry.exception.RetryException;
-import shuaicj.retry.exception.RetryExhaustedException;
+import shuaicj.retry.exception.RetryExecutionException;
 import shuaicj.retry.exception.RetryInterruptedException;
 import shuaicj.retry.exception.RetryPredicateFailedException;
 import shuaicj.retry.exception.RetryPredicateFalseException;
@@ -82,12 +82,12 @@ public class RetryUtil {
     }
 
     /**
-     * Retry if any exception is thrown in 'callable', or the retry test returns false in 'until'.
+     * Retry if any exception is thrown in 'callable', or the retry predicate returns false in 'until'.
      * The result will be returned if success.
      *
      * @param message message to print in retry
      * @param callable the real operation
-     * @param until the retry test, returns false if next retry is required
+     * @param until the retry predicate, returns false if next retry is required
      * @param maxRetries max times of retry
      * @param delayMillis delay in milliseconds between retries
      * @param <T> the return type
@@ -96,58 +96,44 @@ public class RetryUtil {
      */
     public static <T> T retry(String message, Callable<T> callable, Predicate<T> until,
                               long maxRetries, long delayMillis) throws RetryException {
-        for (long i = 0; i < maxRetries; i++) {
-            T result = null;
-            Throwable callException = null;
+        for (long i = 1; i <= maxRetries; i++) {
+            T result;
             try {
                 result = callable.call();
             } catch (Throwable e) {
                 logger.error(message + " retry " + i + " failed, " + e.toString());
-                callException = e;
-            }
-
-            boolean testOk = false;
-            Throwable testException = null;
-            if (callException == null) {
-                try {
-                    testOk = until.test(result);
-                } catch (Throwable e) {
-                    logger.error(message + " retry " + i + " failed, " + e.toString());
-                    testException = e;
+                if (i == maxRetries) {
+                    throw new RetryExecutionException(message + " retry " + i + " failed finally", e);
                 }
-            }
-
-            if (testException == null) {
-                if (testOk) {
-                    return result;
-                }
-                logger.error(message + " retry " + i + " the retry test returns false");
-            }
-
-            if (i < maxRetries - 1) {
                 sleep(delayMillis, message + " retry " + i + " interrupted");
                 continue;
             }
-
-            String errMessage = message + " retry " + i + " failed finally";
-            if (callException != null) {
-                throw new RetryExhaustedException(errMessage, callException);
+            try {
+                if (until.test(result)) {
+                    return result;
+                }
+                logger.error(message + " retry " + i + " the retry predicate returns false");
+                if (i == maxRetries) {
+                    throw new RetryPredicateFalseException(result, message + " retry " + i + " failed finally");
+                }
+            } catch (Throwable e) {
+                logger.error(message + " retry " + i + " failed, " + e.toString());
+                if (i == maxRetries) {
+                    throw new RetryPredicateFailedException(result, message + " retry " + i + " failed finally", e);
+                }
+                sleep(delayMillis, message + " retry " + i + " interrupted");
             }
-            if (testException != null) {
-                throw new RetryPredicateFailedException(result, errMessage, testException);
-            }
-            throw new RetryPredicateFalseException(result, errMessage);
         }
         // impossible to be here
         return null;
     }
 
     /**
-     * Retry if any exception is thrown in 'runnable', or the retry test returns false in 'until'.
+     * Retry if any exception is thrown in 'runnable', or the retry predicate returns false in 'until'.
      *
      * @param message message to print in retry
      * @param runnable the real operation
-     * @param until the retry test, returns false if next retry is required
+     * @param until the retry predicate, returns false if next retry is required
      * @param maxRetries max times of retry
      * @param delayMillis delay in milliseconds between retries
      * @throws RetryException if retry failed finally
