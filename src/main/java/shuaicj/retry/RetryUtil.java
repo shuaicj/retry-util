@@ -124,8 +124,8 @@ public class RetryUtil {
                 if (i == maxRetries) {
                     throw new RetryPredicateFailedException(result, message + " retry " + i + " failed finally", e);
                 }
-                sleep(delayMillis, message + " retry " + i + " interrupted");
             }
+            sleep(delayMillis, message + " retry " + i + " interrupted");
         }
         // impossible to be here
         return null;
