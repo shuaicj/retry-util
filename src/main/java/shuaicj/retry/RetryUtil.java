@@ -101,7 +101,7 @@ public class RetryUtil {
             try {
                 result = callable.call();
             } catch (InterruptedException e) {
-                logger.error(message + " retry " + i + " interrupted");
+                logger.warn(message + " retry " + i + " interrupted, " + e.toString());
                 throw new RetryInterruptedException(message + " retry " + i + " interrupted", e);
             } catch (Throwable e) {
                 logger.error(message + " retry " + i + " failed, " + e.toString());
@@ -115,7 +115,7 @@ public class RetryUtil {
                 if (until.test(result)) {
                     return result;
                 }
-                logger.error(message + " retry " + i + " the retry predicate returns false");
+                logger.warn(message + " retry " + i + " the retry predicate returns false");
                 if (i == maxRetries) {
                     throw new RetryPredicateFalseException(result, message + " retry " + i + " failed finally");
                 }
@@ -154,6 +154,7 @@ public class RetryUtil {
         try {
             Thread.sleep(millis);
         } catch (InterruptedException e) {
+            logger.warn(message + ", " + e.toString());
             throw new RetryInterruptedException(message, e);
         }
     }
