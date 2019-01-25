@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import shuaicj.retry.exception.RetryException;
 import shuaicj.retry.exception.RetryExecutionException;
-import shuaicj.retry.exception.RetryInterruptedException;
 import shuaicj.retry.exception.RetryPredicateFailedException;
 import shuaicj.retry.exception.RetryPredicateFalseException;
 
@@ -19,71 +18,78 @@ public class RetryUtil {
 
     private static final Logger logger = LoggerFactory.getLogger(RetryUtil.class);
 
+    public static final long FOREVER_RETRIES = Long.MAX_VALUE;
     public static final long DEFAULT_RETRIES = 3L;
     public static final long DEFAULT_DELAY = 5L;
     public static final TimeUnit DEFAULT_UNIT = TimeUnit.SECONDS;
 
-    public static <T> T retryForever(String message, Callable<T> callable) throws RetryException {
-        return retry(message, callable, t -> true, Long.MAX_VALUE, DEFAULT_DELAY, DEFAULT_UNIT);
+    public static <T> T retryForever(String message, Callable<T> callable)
+            throws InterruptedException, RetryException {
+        return retry(message, callable, t -> true, FOREVER_RETRIES, DEFAULT_DELAY, DEFAULT_UNIT);
     }
 
     public static <T> T retryForever(String message, Callable<T> callable, long delay, TimeUnit unit)
-            throws RetryException {
-        return retry(message, callable, t -> true, Long.MAX_VALUE, delay, unit);
+            throws InterruptedException, RetryException {
+        return retry(message, callable, t -> true, FOREVER_RETRIES, delay, unit);
     }
 
-    public static void retryForever(String message, RetryRunnable runnable) throws RetryException {
-        retry(message, runnable, () -> true, Long.MAX_VALUE, DEFAULT_DELAY, DEFAULT_UNIT);
+    public static void retryForever(String message, RetryRunnable runnable)
+            throws InterruptedException, RetryException {
+        retry(message, runnable, () -> true, FOREVER_RETRIES, DEFAULT_DELAY, DEFAULT_UNIT);
     }
 
     public static void retryForever(String message, RetryRunnable runnable, long delay, TimeUnit unit)
-            throws RetryException {
-        retry(message, runnable, () -> true, Long.MAX_VALUE, delay, unit);
+            throws InterruptedException, RetryException {
+        retry(message, runnable, () -> true, FOREVER_RETRIES, delay, unit);
     }
 
     public static <T> T retryUntil(String message, Callable<T> callable, Predicate<T> until)
-            throws RetryException {
-        return retry(message, callable, until, Long.MAX_VALUE, DEFAULT_DELAY, DEFAULT_UNIT);
+            throws InterruptedException, RetryException {
+        return retry(message, callable, until, FOREVER_RETRIES, DEFAULT_DELAY, DEFAULT_UNIT);
     }
 
     public static <T> T retryUntil(String message, Callable<T> callable, Predicate<T> until, long delay, TimeUnit unit)
-            throws RetryException {
-        return retry(message, callable, until, Long.MAX_VALUE, delay, unit);
+            throws InterruptedException, RetryException {
+        return retry(message, callable, until, FOREVER_RETRIES, delay, unit);
     }
 
     public static void retryUntil(String message, RetryRunnable runnable, RetryPredicate until)
-            throws RetryException {
-        retry(message, runnable, until, Long.MAX_VALUE, DEFAULT_DELAY, DEFAULT_UNIT);
+            throws InterruptedException, RetryException {
+        retry(message, runnable, until, FOREVER_RETRIES, DEFAULT_DELAY, DEFAULT_UNIT);
     }
 
     public static void retryUntil(String message, RetryRunnable runnable, RetryPredicate until, long delay, TimeUnit unit)
-            throws RetryException {
-        retry(message, runnable, until, Long.MAX_VALUE, delay, unit);
+            throws InterruptedException, RetryException {
+        retry(message, runnable, until, FOREVER_RETRIES, delay, unit);
     }
 
-    public static <T> T retry(String message, Callable<T> callable) throws RetryException {
+    public static <T> T retry(String message, Callable<T> callable)
+            throws InterruptedException, RetryException {
         return retry(message, callable, t -> true, DEFAULT_RETRIES, DEFAULT_DELAY, DEFAULT_UNIT);
     }
 
-    public static <T> T retry(String message, Callable<T> callable, long maxRetries) throws RetryException {
+    public static <T> T retry(String message, Callable<T> callable, long maxRetries)
+            throws InterruptedException, RetryException {
         return retry(message, callable, t -> true, maxRetries, DEFAULT_DELAY, DEFAULT_UNIT);
     }
 
     public static <T> T retry(String message, Callable<T> callable, long maxRetries, long delay, TimeUnit unit)
-            throws RetryException {
+            throws InterruptedException, RetryException {
         return retry(message, callable, t -> true, maxRetries, delay, unit);
     }
 
-    public static void retry(String message, RetryRunnable runnable) throws RetryException {
+    public static void retry(String message, RetryRunnable runnable)
+            throws InterruptedException, RetryException {
         retry(message, runnable, () -> true, DEFAULT_RETRIES, DEFAULT_DELAY, DEFAULT_UNIT);
     }
 
-    public static void retry(String message, RetryRunnable runnable, long maxRetries) throws RetryException {
+    public static void retry(String message, RetryRunnable runnable, long maxRetries)
+            throws InterruptedException, RetryException {
         retry(message, runnable, () -> true, maxRetries, DEFAULT_DELAY, DEFAULT_UNIT);
     }
 
     public static void retry(String message, RetryRunnable runnable, long maxRetries, long delay, TimeUnit unit)
-            throws RetryException {
+            throws InterruptedException, RetryException {
         retry(message, runnable, () -> true, maxRetries, delay, unit);
     }
 
@@ -101,15 +107,15 @@ public class RetryUtil {
      * @return the callable result
      * @throws RetryException if retry failed finally
      */
-    public static <T> T retry(String message, Callable<T> callable, Predicate<T> until,
-                              long maxRetries, long delay, TimeUnit unit) throws RetryException {
+    public static <T> T retry(String message, Callable<T> callable, Predicate<T> until, long maxRetries,
+                              long delay, TimeUnit unit) throws InterruptedException, RetryException {
         for (long i = 1; i <= maxRetries; i++) {
             T result;
             try {
                 result = callable.call();
             } catch (InterruptedException e) {
                 logger.warn(message + " retry " + i + " interrupted, " + e.toString());
-                throw new RetryInterruptedException(message + " retry " + i + " interrupted", e);
+                throw e;
             } catch (Throwable e) {
                 logger.error(message + " retry " + i + " failed, " + e.toString());
                 if (i == maxRetries) {
@@ -149,8 +155,8 @@ public class RetryUtil {
      * @param unit delay unit
      * @throws RetryException if retry failed finally
      */
-    public static void retry(String message, RetryRunnable runnable, RetryPredicate until,
-                             long maxRetries,  long delay, TimeUnit unit) throws RetryException {
+    public static void retry(String message, RetryRunnable runnable, RetryPredicate until, long maxRetries,
+                             long delay, TimeUnit unit) throws InterruptedException, RetryException {
         // forward to the above method
         retry(message, () -> {
             runnable.run();
@@ -158,12 +164,12 @@ public class RetryUtil {
         }, b -> until.test(), maxRetries, delay, unit);
     }
 
-    private static void sleep(long delay, TimeUnit unit, String message) throws RetryInterruptedException {
+    private static void sleep(long delay, TimeUnit unit, String message) throws InterruptedException {
         try {
             unit.sleep(delay);
         } catch (InterruptedException e) {
             logger.warn(message + ", " + e.toString());
-            throw new RetryInterruptedException(message, e);
+            throw e;
         }
     }
 }
