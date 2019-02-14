@@ -132,6 +132,8 @@ public class RetryUtil {
                 if (i == maxRetries) {
                     throw new RetryPredicateFalseException(result, message + " retry " + i + " failed finally");
                 }
+            } catch (RetryPredicateFalseException e) {
+                throw e;
             } catch (Throwable e) {
                 logger.error(message + " retry " + i + " failed, " + e.toString());
                 if (i == maxRetries) {

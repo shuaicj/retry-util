@@ -10,7 +10,7 @@ Simple java util for retry.
     <dependency>
         <groupId>com.github.shuaicj</groupId>
         <artifactId>retry-util</artifactId>
-        <version>0.0.8</version>
+        <version>0.0.9</version>
     </dependency>
 </dependencies>
 
