@@ -48,6 +48,11 @@ public class RetryUtil {
         return retry(message, callable, until, FOREVER_RETRIES, DEFAULT_DELAY, DEFAULT_UNIT);
     }
 
+    public static <T> T retryUntil(String message, Callable<T> callable, Predicate<T> until, long maxRetries)
+            throws InterruptedException, RetryException {
+        return retry(message, callable, until, maxRetries, DEFAULT_DELAY, DEFAULT_UNIT);
+    }
+
     public static <T> T retryUntil(String message, Callable<T> callable, Predicate<T> until, long delay, TimeUnit unit)
             throws InterruptedException, RetryException {
         return retry(message, callable, until, FOREVER_RETRIES, delay, unit);
@@ -56,6 +61,11 @@ public class RetryUtil {
     public static void retryUntil(String message, RetryRunnable runnable, RetryPredicate until)
             throws InterruptedException, RetryException {
         retry(message, runnable, until, FOREVER_RETRIES, DEFAULT_DELAY, DEFAULT_UNIT);
+    }
+
+    public static void retryUntil(String message, RetryRunnable runnable, RetryPredicate until, long maxRetries)
+            throws InterruptedException, RetryException {
+        retry(message, runnable, until, maxRetries, DEFAULT_DELAY, DEFAULT_UNIT);
     }
 
     public static void retryUntil(String message, RetryRunnable runnable, RetryPredicate until, long delay, TimeUnit unit)
